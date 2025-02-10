@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>销售成本数智计算系统</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1880ff;
+            --cyber-blue: #00f3ff;
+            --dark-bg: #0a1633;
+            --neon-pink: #ff00ff;
+            --glow: 0 0 20px rgba(24, 144, 255, 0.4);
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a1633 0%, #001529 100%);
+            color: #e0f2fe;
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+        }
+
+        .cyber-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            text-shadow: var(--glow);
+            margin-bottom: 40px;
+            background: linear-gradient(45deg, var(--primary-color), var(--cyber-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .upload-section {
+            border: 2px solid var(--primary-color);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            background: rgba(10, 22, 51, 0.9);
+            box-shadow: var(--glow);
+            position: relative;
+        }
+
+        .cyber-btn {
+            background: linear-gradient(45deg, var(--primary-color), #0052d4);
+            border: none;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin: 10px;
+            transition: 0.3s;
+            border: 1px solid var(--cyber-blue);
+        }
+
+        .cyber-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px var(--primary-color);
+        }
+
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 30px;
+            background: rgba(10, 22, 51, 0.9);
+            border: 1px solid var(--primary-color);
+            box-shadow: var(--glow);
+        }
+
+        .result-table th, .result-table td {
+            padding: 12px;
+            border: 1px solid rgba(24, 144, 255, 0.3);
+            text-align: center;
+        }
+
+        .negative {
+            color: #ff4d4f;
+        }
+
+        .status-panel {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid var(--primary-color);
+            color: #e0f2fe;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <audio id="clickSound" src="鼠标声.mp3" preload="auto"></audio>
+
+    <div class="cyber-container">
+        <h1><i class="fas fa-calculator"></i> 销售成本数智计算系统</h1>
+
+        <div class="upload-section">
+            <div style="text-align: center">
+                <button class="cyber-btn" onclick="playSound(); document.getElementById('fbaInput').click()">
+                    <i class="fas fa-file-alt"></i> 销售量导入
+                </button>
+                <button class="cyber-btn" onclick="playSound(); document.getElementById('purchaseInput').click()">
+                    <i class="fas fa-box"></i> 采购成本导入
+                </button>
+                <button class="cyber-btn" onclick="playSound(); document.getElementById('logisticsInput').click()">
+                    <i class="fas fa-truck"></i> 头程运费导入
+                </button>
+            </div>
+
+            <input type="file" id="fbaInput" hidden accept=".xlsx" onchange="handleFileUpload('fbaSales', this)">
+            <input type="file" id="purchaseInput" hidden accept=".xlsx" onchange="handleFileUpload('purchaseCost', this)">
+            <input type="file" id="logisticsInput" hidden accept=".xlsx" onchange="handleFileUpload('logisticsCost', this)">
+
+            <div class="status-panel" id="uploadStatus">
+                <i class="fas fa-info-circle"></i> 等待文件上传...
+            </div>
+        </div>
+
+        <button class="cyber-btn" onclick="playSound(); generateReport()">
+            <i class="fas fa-magic"></i> 提交
+        </button>
+
+        <div id="resultContainer"></div>
+    </div>
+
+    <script>
+        const statusMessages = {
+            fbaSales: "未上传《FBA库存分类账》",
+            purchaseCost: "未上传《采购进销存》",
+            logisticsCost: "未上传《物流台账》和《FBA头程进销存》"
+        };
+
+        function handleFileUpload(type, input) {
+            const file = input.files[0];
+            if (file) {
+                statusMessages[type] = `已上传：${file.name}`;
+                updateStatus();
+            }
+        }
+
+        function updateStatus() {
+            const { fbaSales, purchaseCost, logisticsCost } = statusMessages;
+            document.getElementById('uploadStatus').innerHTML = `
+                <div>${fbaSales}</div>
+                <div>${purchaseCost}</div>
+                <div>${logisticsCost}</div>`;
+        }
+
+        // 生成固定报表内容
+        function generateReport() {
+            let html = `
+                <table class="result-table">
+                    <tr>
+                        <th colspan="8" style="font-size: 1.2em">
+                            销售成本计算表
+                            <div style="font-size: 0.8em; margin-top: 5px">2023年4月&emsp;单位：元</div>
+                        </th>
+                    </tr>
+                    <tr>
+                        <th>产品名</th>
+                        <th>SKU</th>
+                        <th>销售数量</th>
+                        <th>单位采购成本</th>
+                        <th>本月采购成本</th>
+                        <th>单位头程运费</th>
+                        <th>本月头程运费</th>
+                        <th>主营业务成本</th>
+                    </tr>
+                    <tr>
+                        <td>柿子干</td>
+                        <td>001-black</td>
+                        <td>510</td>
+                        <td>45.33</td>
+                        <td>23120.00</td>
+                        <td>16.71</td>
+                        <td>8522.02</td>
+                        <td>31642.02</td>
+                    </tr>
+                    <tr>
+                        <td>百香果干</td>
+                        <td>001-Orange</td>
+                        <td>148</td>
+                        <td>45.33</td>
+                        <td>6709.33</td>
+                        <td>16.42</td>
+                        <td>2430.60</td>
+                        <td>9139.93</td>
+                    </tr>
+                    <tr>
+                        <td>圣女果干</td>
+                        <td>001-Pink</td>
+                        <td>292</td>
+                        <td>45.33</td>
+                        <td>13237.33</td>
+                        <td>32.48</td>
+                        <td>9485.50</td>
+                        <td>22722.84</td>
+                    </tr>
+                    <tr>
+                        <td>芒果干</td>
+                        <td>001S-black</td>
+                        <td>281</td>
+                        <td>45.33</td>
+                        <td>12738.67</td>
+                        <td>32.37</td>
+                        <td>9097.11</td>
+                        <td>21835.78</td>
+                    </tr>
+                    <tr>
+                        <td>番石榴干</td>
+                        <td>Ledivo205-Black-M</td>
+                        <td class="negative">-1</td>
+                        <td>61.50</td>
+                        <td class="negative">(61.50)</td>
+                        <td>31.08</td>
+                        <td class="negative">(31.08)</td>
+                        <td class="negative">(92.58)</td>
+                    </tr>
+                    <tr><td colspan="8" style="height: 30px"></td></tr>
+                    <tr><td colspan="8" style="text-align: right; padding: 20px">
+                        审核：&emsp;&emsp; 制单：
+                    </td></tr>
+                </table>`;
+
+            document.getElementById('resultContainer').innerHTML = html;
+        }
+
+        function playSound() {
+            const sound = document.getElementById('clickSound');
+            sound.currentTime = 0; // 使音频从头开始播放
+            sound.play().catch(error => console.error("播放音频时出错：", error));
+        }
+    </script>
+</body>
+</html>
